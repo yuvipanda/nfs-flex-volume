@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 )
 
 func makeResponse(status, message string) map[string]interface{} {
@@ -25,6 +26,19 @@ func Init() interface{} {
 		"attach": false,
 	}
 	return resp
+}
+
+func isStaleMount(path string) bool {
+	stat := syscall.Stat_t{}
+	err := syscall.Stat(path, &stat)
+	if err != nil {
+		if errno, ok := err.(syscall.Errno); ok {
+			if errno == syscall.ESTALE {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func isMountPoint(path string) bool {
@@ -53,6 +67,14 @@ func Mount(target string, options map[string]string) interface{} {
 	//createGid := strconv.Atoi(options["createGid"])
 
 	mountPath := fmt.Sprintf("/mnt/nfsflexvolume/%s/options/%s", sharePath, sortedOpts)
+
+	if isStaleMount(mountPath) {
+		unmountCmd := exec.Command("umount", mountPath)
+		out, err := unmountCmd.CombinedOutput()
+		if err != nil {
+			return makeResponse("Failure", fmt.Sprintf("%s: %s", err.Error(), out))
+		}
+	}
 
 	if !isMountPoint(mountPath) {
 		os.MkdirAll(mountPath, 0755)
