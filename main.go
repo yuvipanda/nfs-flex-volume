@@ -12,17 +12,31 @@ import (
 	"syscall"
 )
 
-func makeResponse(status, message string) map[string]interface{} {
-	return map[string]interface{}{
-		"status":  status,
-		"message": message,
+type Response struct {
+	Status       string                 `json:"status"`
+	Message      string                 `json:"message"`
+	Capabilities map[string]interface{} `json:"capabilities"`
+}
+
+func (r *Response) printJson() {
+	jsonBytes, err := json.Marshal(r)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("%s", string(jsonBytes))
+}
+
+func makeResponse(status, message string) *Response {
+	return &Response{
+		Status:  status,
+		Message: message,
 	}
 }
 
 /// Return status
-func Init() map[string]interface{} {
+func Init() *Response {
 	resp := makeResponse("Success", "No Initialization required")
-	resp["capabilities"] = map[string]interface{}{
+	resp.Capabilities = map[string]interface{}{
 		"attach": false,
 	}
 	return resp
@@ -52,7 +66,7 @@ func isMountPoint(path string) bool {
 
 /// If NFS hasn't been mounted yet, mount!
 /// If mounted, bind mount to appropriate place.
-func Mount(target string, options map[string]string) map[string]interface{} {
+func Mount(target string, options map[string]string) *Response {
 	opts := strings.Split(options["mountOptions"], ",")
 	sort.Strings(opts)
 	sortedOpts := strings.Join(opts, ",")
@@ -120,7 +134,7 @@ func Mount(target string, options map[string]string) map[string]interface{} {
 	return makeResponse("Success", "Mount completed!")
 }
 
-func Unmount(mountPath string) interface{} {
+func Unmount(mountPath string) *Response {
 	err := os.Remove(mountPath)
 	if err != nil {
 		return makeResponse("Failure", fmt.Sprintf("Could not unmount %s: %s", mountPath, err.Error()))
@@ -128,27 +142,19 @@ func Unmount(mountPath string) interface{} {
 	return makeResponse("Success", "Successfully unmounted")
 }
 
-func printJSON(data interface{}) {
-	jsonBytes, err := json.Marshal(data)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("%s", string(jsonBytes))
-}
-
 func main() {
 	switch action := os.Args[1]; action {
 	case "init":
-		printJSON(Init())
+		Init().printJson()
 	case "mount":
 		optsString := os.Args[3]
 		opts := make(map[string]string)
 		json.Unmarshal([]byte(optsString), &opts)
-		printJSON(Mount(os.Args[2], opts))
+		Mount(os.Args[2], opts).printJson()
 	case "unmount":
-		printJSON(Unmount(os.Args[2]))
+		Unmount(os.Args[2]).printJson()
 	default:
-		printJSON(makeResponse("Not supported", fmt.Sprintf("Operation %s is not supported", action)))
+		makeResponse("Not supported", fmt.Sprintf("Operation %s is not supported", action)).printJson()
 	}
 
 }
