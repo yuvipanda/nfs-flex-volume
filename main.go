@@ -172,10 +172,10 @@ func Mount(target string, vs *VolumeSource) *Response {
 	return makeResponse("Success", "Mount completed!")
 }
 
-func Unmount(mountPath string) *Response {
-	err := os.Remove(mountPath)
+func Unmount(target string) *Response {
+	err := os.Remove(target)
 	if err != nil {
-		return makeResponse("Failure", fmt.Sprintf("Could not unmount %s: %s", mountPath, err.Error()))
+		return makeResponse("Failure", fmt.Sprintf("Could not unlink %s: %s", target, err.Error()))
 	}
 	return makeResponse("Success", "Successfully unmounted")
 }
