@@ -20,7 +20,7 @@ func makeResponse(status, message string) map[string]interface{} {
 }
 
 /// Return status
-func Init() interface{} {
+func Init() map[string]interface{} {
 	resp := makeResponse("Success", "No Initialization required")
 	resp["capabilities"] = map[string]interface{}{
 		"attach": false,
@@ -52,7 +52,7 @@ func isMountPoint(path string) bool {
 
 /// If NFS hasn't been mounted yet, mount!
 /// If mounted, bind mount to appropriate place.
-func Mount(target string, options map[string]string) interface{} {
+func Mount(target string, options map[string]string) map[string]interface{} {
 	opts := strings.Split(options["mountOptions"], ",")
 	sort.Strings(opts)
 	sortedOpts := strings.Join(opts, ",")
@@ -72,17 +72,20 @@ func Mount(target string, options map[string]string) interface{} {
 		unmountCmd := exec.Command("umount", mountPath)
 		out, err := unmountCmd.CombinedOutput()
 		if err != nil {
-			return makeResponse("Failure", fmt.Sprintf("%s: %s", err.Error(), out))
+			return makeResponse("Failure", fmt.Sprintf("Could not unmount stale mount %s %s: %s", mountPath, err.Error(), out))
 		}
 	}
 
 	if !isMountPoint(mountPath) {
-		os.MkdirAll(mountPath, 0755)
+		err := os.MkdirAll(mountPath, 0755)
 
+		if err != nil {
+			return makeResponse("Failure", fmt.Sprintf("Could not make mountPath %s: %s", mountPath, err.Error()))
+		}
 		mountCmd := exec.Command("mount", "-t", "nfs4", sharePath, mountPath, "-o", sortedOpts)
 		out, err := mountCmd.CombinedOutput()
 		if err != nil {
-			return makeResponse("Failure", fmt.Sprintf("%s: %s", err.Error(), out))
+			return makeResponse("Failure", fmt.Sprintf("Could not mount %s: %s", err.Error(), out))
 		}
 	}
 
@@ -93,15 +96,26 @@ func Mount(target string, options map[string]string) interface{} {
 		if err != nil {
 			return makeResponse("Failure", fmt.Sprintf("Could not create subPath: %s", err.Error()))
 		}
+	} else {
+		_, err := os.Stat(srcPath)
+		if err != nil {
+			return makeResponse("Failure", fmt.Sprintf("Could not find path %s to be mounted: %s", srcPath, err.Error()))
+		}
 	}
 
 	// Now we rmdir the target, and then make a symlink to it!
 	err = os.Remove(target)
 	if err != nil {
-		return makeResponse("Failure", err.Error())
+		if !os.IsNotExist(err) {
+			return makeResponse("Failure", fmt.Sprintf("Could not remove target %s before symlink: %s", target, err.Error()))
+		}
 	}
 
 	err = os.Symlink(srcPath, target)
+
+	if err != nil {
+		return makeResponse("Failure", fmt.Sprintf("Could not symlink %s to %s: %s", srcPath, target, err.Error()))
+	}
 
 	return makeResponse("Success", "Mount completed!")
 }
@@ -109,7 +123,7 @@ func Mount(target string, options map[string]string) interface{} {
 func Unmount(mountPath string) interface{} {
 	err := os.Remove(mountPath)
 	if err != nil {
-		return makeResponse("Failure", err.Error())
+		return makeResponse("Failure", fmt.Sprintf("Could not unmount %s: %s", mountPath, err.Error()))
 	}
 	return makeResponse("Success", "Successfully unmounted")
 }
