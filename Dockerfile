@@ -1,7 +1,7 @@
 FROM golang:1.9.2
 
-COPY main.go /go
-RUN go build /go/main.go
+COPY *.go /go/
+RUN go build /go/*.go
 
 FROM alpine:3.6
 
