@@ -1,3 +1,5 @@
+**Deprecated**: Just use an NFS PVC, things seem ok. *If* you find out that there *is* a real problem (which I doubt), consider writing a CSI driver that does this.
+
 # NFS FlexVolume
 
 An out of tree, FlexVolume based NFS volume provider for kubernetes.
